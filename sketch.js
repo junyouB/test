@@ -80,9 +80,160 @@ function getSpectralColor(dataArray) {
     return color;
 }
 
+// --- 中国传统颜色映射 ---
+const TRADITIONAL_COLORS = [
+    { name: "朱砂", hue: 0.0, color: "#ff4c00" }, // Red
+    { name: "琥珀", hue: 0.08, color: "#ca6924" }, // Orange
+    { name: "藤黄", hue: 0.15, color: "#ffb61e" }, // Yellow
+    { name: "柳黄", hue: 0.25, color: "#afdd22" }, // Yellow-Green
+    { name: "翠微", hue: 0.35, color: "#4c8dae" }, // Green
+    { name: "天青", hue: 0.5, color: "#228fbd" }, // Cyan
+    { name: "月白", hue: 0.55, color: "#d6ecf0" }, // Light Blue
+    { name: "靛蓝", hue: 0.6, color: "#065279" }, // Blue
+    { name: "黛蓝", hue: 0.65, color: "#425066" }, // Dark Blue
+    { name: "紫鸢", hue: 0.75, color: "#934d91" }, // Violet
+    { name: "紫檀", hue: 0.85, color: "#4c221b" }, // Purple
+    { name: "胭脂", hue: 0.95, color: "#9d2933" }  // Magenta/Red
+];
+
+function getTraditionalColorName(hue) {
+    // Hue is 0.0 - 1.0
+    // 找到最接近的颜色
+    let minDiff = 1.0;
+    let bestMatch = TRADITIONAL_COLORS[0];
+    
+    for (let c of TRADITIONAL_COLORS) {
+        let diff = Math.abs(c.hue - hue);
+        if (diff > 0.5) diff = 1.0 - diff; // 环形处理
+        if (diff < minDiff) {
+            minDiff = diff;
+            bestMatch = c;
+        }
+    }
+    return bestMatch;
+}
+
+// --- 声纹星球绘制 (Circular Visualizer) ---
+let waveformCtx;
+let waveformCanvas;
+let waveformHistory = []; // 存储历史数据，用于画圈
+const MAX_HISTORY = 60; // 存储最近 60 帧 (约1秒，或者更长如果转得慢)
+let planetRotation = 0;
+
+// 颜色识别平滑处理
+let smoothedHue = 0.5; // 初始青色
+let hueUpdateTimer = 0;
+const HUE_UPDATE_INTERVAL = 0.5; // 每 0.5 秒更新一次颜色文字
+
+function initWaveform() {
+    waveformCanvas = document.getElementById('waveform-history');
+    if (waveformCanvas) {
+        // 设置高分辨率以保证线条细腻
+        waveformCanvas.width = 400; 
+        waveformCanvas.height = 400; 
+        waveformCtx = waveformCanvas.getContext('2d');
+        // 初始化历史数据
+        for(let i=0; i<MAX_HISTORY; i++) {
+            waveformHistory.push({ level: 0, color: '#000000' });
+        }
+    }
+}
+
+function updateWaveform(level, spectralColor) {
+    if (!waveformCtx) return;
+    
+    const w = waveformCanvas.width;
+    const h = waveformCanvas.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const radius = w * 0.3; // 基础星球半径
+    
+    // 1. 更新历史数据
+    waveformHistory.push({
+        level: level,
+        color: '#' + spectralColor.getHexString()
+    });
+    if (waveformHistory.length > MAX_HISTORY) {
+        waveformHistory.shift();
+    }
+    
+    // 2. 清空画布
+    waveformCtx.clearRect(0, 0, w, h);
+    
+    // 3. 绘制星球核心 (微弱发光)
+    const gradient = waveformCtx.createRadialGradient(cx, cy, radius * 0.5, cx, cy, radius);
+    gradient.addColorStop(0, 'rgba(0,0,0,0)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0.05)');
+    waveformCtx.fillStyle = gradient;
+    waveformCtx.beginPath();
+    waveformCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+    waveformCtx.fill();
+    
+    // 4. 绘制声纹环绕线条 (High-end Lines)
+    waveformCtx.save();
+    waveformCtx.translate(cx, cy);
+    // 让整个环慢慢旋转
+    planetRotation += 0.005; 
+    waveformCtx.rotate(planetRotation);
+    
+    const angleStep = (Math.PI * 2) / MAX_HISTORY;
+    
+    // 绘制多层线条以增加高级感
+    // Layer 1: 外部波动线
+    waveformCtx.beginPath();
+    for (let i = 0; i < waveformHistory.length; i++) {
+        const data = waveformHistory[i];
+        const angle = i * angleStep;
+        
+        // 振幅：基于 level，加上一点点噪声
+        const amp = data.level * (w * 0.15); 
+        const r = radius + amp;
+        
+        const x = Math.cos(angle) * r;
+        const y = Math.sin(angle) * r;
+        
+        if (i === 0) waveformCtx.moveTo(x, y);
+        else waveformCtx.lineTo(x, y);
+    }
+    // 闭合圆环
+    waveformCtx.closePath();
+    waveformCtx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    waveformCtx.lineWidth = 1.5;
+    waveformCtx.stroke();
+    
+    // Layer 2: 内部辉光线 (颜色跟随声音)
+    waveformCtx.beginPath();
+    for (let i = 0; i < waveformHistory.length; i++) {
+        const data = waveformHistory[i];
+        const angle = i * angleStep;
+        // 稍微滞后一点的半径
+        const r = radius + data.level * (w * 0.1) * 0.5; 
+        const x = Math.cos(angle) * r;
+        const y = Math.sin(angle) * r;
+        
+        if (i === 0) waveformCtx.moveTo(x, y);
+        else waveformCtx.lineTo(x, y);
+    }
+    waveformCtx.closePath();
+    
+    // 使用当前主色调绘制光晕
+    const currentColorHex = waveformHistory[waveformHistory.length - 1].color;
+    waveformCtx.strokeStyle = currentColorHex;
+    waveformCtx.lineWidth = 1;
+    waveformCtx.globalAlpha = 0.6;
+    waveformCtx.stroke();
+    
+    waveformCtx.restore();
+}
+
 function init() {
     // 1. 初始化 Three.js 场景
     scene = new THREE.Scene();
+    
+    // 2. 初始化声纹 UI
+    initWaveform();
+
+    // 3. 相机设置
     scene.background = new THREE.Color(0x000000); // 纯黑背景
     scene.fog = new THREE.FogExp2(0x000000, 0.002);
 
@@ -112,7 +263,7 @@ function init() {
     
     // 5. 创建几何图案雨系统
     createGeometricRainSystem();
-
+    
     // 6. 事件监听
     window.addEventListener('resize', onResize);
     
@@ -804,6 +955,10 @@ function simulateAudioData() {
     return currentSimulatedVolume > 0.6;
 }
 
+let sustainedTimer = 0; // 全局定义，用于记录持续发声时间
+const SUSTAIN_THRESHOLD = 0.3; // 持续音量阈值
+let lastVolume = 0; // 上一帧音量，用于检测突变
+
 function animate() {
     requestAnimationFrame(animate);
     
@@ -862,6 +1017,24 @@ function animate() {
             trebleLevel = Math.min(1.0, trebleLevel * CONFIG.sensitivity);
         }
         
+        // --- 互动检测逻辑 (Interaction Detection) ---
+        
+        // A. 心跳/敲击检测 (Percussive)
+        // 逻辑：当前音量比上一帧音量大很多 (突变)
+        if (level - lastVolume > 0.15) { 
+            // 冲击波已移除
+            // triggerPulse(0xff3333); 
+        }
+        lastVolume = level;
+        
+        // B. 灵魂气息检测 (Sustained)
+        // 逻辑：音量持续保持在一定水平以上
+        if (level > SUSTAIN_THRESHOLD) {
+            sustainedTimer += 0.016;
+        } else {
+            sustainedTimer = Math.max(0, sustainedTimer - 0.05); // 快速衰减
+        }
+        
         // 3. 计算基于频谱的特殊颜色编码
         if (level > 0.01) {
              // 演示模式下简单模拟颜色变化
@@ -870,7 +1043,32 @@ function animate() {
              } else {
                  spectralColor = getSpectralColor(dataArray);
              }
+             
+             // 更新 UI: 声音颜色文字
+             // 获取 Hue 值
+             const hsl = {};
+             spectralColor.getHSL(hsl);
+             
+             // 平滑处理 Hue (避免文字闪烁)
+             // 简单的低通滤波
+             smoothedHue += (hsl.h - smoothedHue) * 0.1;
+             
+             hueUpdateTimer += 0.016;
+             if (hueUpdateTimer > HUE_UPDATE_INTERVAL) {
+                 hueUpdateTimer = 0;
+                 const traditionalColor = getTraditionalColorName(smoothedHue);
+                 
+                 // 更新 DOM
+                 const colorNameEl = document.getElementById('color-name');
+                 if (colorNameEl) {
+                     colorNameEl.innerText = traditionalColor.name;
+                     colorNameEl.style.color = traditionalColor.color;
+                 }
+             }
         }
+        
+        // 更新声纹图 (无论音量大小都更新，没声音画黑线)
+        updateWaveform(level, spectralColor);
     }
 
     // 目标凝聚度计算：
@@ -921,8 +1119,25 @@ let targetRandomScale = 0.3; // 目标随机缩放值
         horseMesh.material.userData.uniforms.chaosFactor.value = chaosFactor;
         
         // 1. 颜色变化
-        let targetColor = new THREE.Color(0xffffff);
-        horseMesh.material.color.lerp(targetColor, 0.1);
+        // 修改：用户要求马保持白色，不再随声音变色
+        // 只有在持续发声 (Soul Breath) 时才叠加金色
+        
+        let targetColor = new THREE.Color(0xffffff); // 始终为纯白
+        
+        if (level > 0.05) {
+            // 如果持续发声 (Soul Breath)，叠加金色
+            if (typeof sustainedTimer !== 'undefined' && sustainedTimer > 1.0) {
+                 targetColor.lerp(new THREE.Color(0xffddaa), 0.5);
+                 horseMesh.material.opacity = Math.min(1.0, CONFIG.opacity + 0.5);
+            } else {
+                 horseMesh.material.opacity = CONFIG.opacity;
+            }
+        } else {
+             horseMesh.material.opacity = CONFIG.opacity;
+        }
+        
+        // 平滑过渡
+        horseMesh.material.color.lerp(targetColor, 0.05);
         
         // 2. 身材比例变化：移除随机缩放，恢复稳定逻辑
         // 静音 (level=0) -> scale = 0.3
@@ -1054,6 +1269,9 @@ let targetRandomScale = 0.3; // 目标随机缩放值
     // 7. 更新几何图案雨
     // 传入固定发射点 tailPos
     updateGeometricRain(level, bassLevel, trebleLevel, tailPos);
+    
+    // 冲击波已移除
+    // updatePulseRings();
 
     /* 移除旧的触发逻辑，因为流线是连续更新的
     if (level > 0.05) { 

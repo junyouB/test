@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Voice Visualizer - Interactive Demo</title>
+    <title>代马 - 互动体验</title>
     
     <!-- 配置 Import Map 以支持 Three.js 模块 -->
     <script type="importmap">
@@ -43,6 +43,18 @@
 </head>
 <body>
     <div class="mobile-instruction">TAP SCREEN TO START<br>SPEAK INTO MICROPHONE</div>
+    
+    <!-- 新增 UI 容器 -->
+    <div id="ui-container">
+        <!-- 左上角：声纹星球 (圆形 Canvas) -->
+        <canvas id="waveform-history" width="200" height="200"></canvas>
+        
+        <!-- 右上角：声音颜色 -->
+        <div id="voice-color-display">
+            <span class="label">你的声音颜色</span>
+            <span id="color-name">...</span>
+        </div>
+    </div>
     
     <!-- 主逻辑脚本 -->
     <script type="module" src="sketch.js"></script>

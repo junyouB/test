@@ -23,3 +23,54 @@ canvas {
     pointer-events: none;
     user-select: none;
 }
+
+/* 移动端 UI 布局 */
+#ui-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none; /* 让点击穿透 */
+    z-index: 10;
+    padding: 20px;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+#waveform-history {
+    width: 120px;
+    height: 120px; /* 圆形 */
+    border-radius: 50%;
+    /* 移除之前的背景和边框 */
+    border: none;
+    background: transparent;
+    /* 可选：加一个微弱的光晕 */
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
+}
+
+#voice-color-display {
+    text-align: right;
+    font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    color: rgba(255,255,255,0.9);
+    text-shadow: 0 0 10px rgba(0,0,0,0.8);
+}
+
+#voice-color-display .label {
+    display: block;
+    font-size: 12px;
+    opacity: 0.7;
+    margin-bottom: 5px;
+}
+
+#color-name {
+    display: block;
+    font-size: 24px;
+    font-weight: 300;
+    letter-spacing: 2px;
+    transition: color 0.5s ease;
+}
+
+/* 演示模式样式 */
