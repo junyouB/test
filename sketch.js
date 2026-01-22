@@ -530,7 +530,19 @@ async function startAudioContext() {
             dataArray = new Uint8Array(bufferLength);
             
             isAudioStarted = true;
-            document.getElementById('overlay-text').style.display = 'none';
+            
+            // 安全隐藏 Overlay
+            const overlay = document.getElementById('overlay-text');
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
+            
+            // 同时隐藏移动端提示
+            const mobileOverlay = document.querySelector('.mobile-instruction');
+            if (mobileOverlay) {
+                mobileOverlay.style.display = 'none';
+            }
+            
             console.log("Audio started");
             
             if (audioContext.state === 'suspended') {
@@ -539,7 +551,21 @@ async function startAudioContext() {
             
         } catch (err) {
             console.error('Error accessing microphone:', err);
-            alert('无法访问麦克风，请确保已授权。');
+            
+            // 更友好的错误提示，区分 HTTPS 问题和其他问题
+            let msg = '无法访问麦克风。';
+            
+            if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+                msg += '\n\n原因：浏览器限制麦克风只能在 HTTPS 安全连接下使用。\n请确保您正在使用 https:// 开头的链接访问。';
+            } else if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                msg += '\n\n原因：您拒绝了麦克风权限。\n请刷新页面并点击“允许”。';
+            } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                msg += '\n\n原因：未检测到麦克风设备。';
+            } else {
+                msg += '\n\n详细错误：' + err.message;
+            }
+            
+            alert(msg);
         }
     }
 }
