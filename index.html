@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Visualizer - Horse Cell</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Voice Visualizer - Interactive Demo</title>
     
     <!-- 配置 Import Map 以支持 Three.js 模块 -->
     <script type="importmap">
@@ -16,9 +16,35 @@
     </script>
     
     <link rel="stylesheet" type="text/css" href="style.css">
-  </head>
-  <body>
+    <style>
+        /* Mobile-specific adjustments */
+        #overlay-text {
+            pointer-events: none; /* Let clicks pass through to body for audio context */
+        }
+        
+        .mobile-instruction {
+            position: absolute;
+            bottom: 20%;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.7);
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            animation: pulse 2s infinite;
+            pointer-events: none;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-instruction">TAP SCREEN TO START<br>SPEAK INTO MICROPHONE</div>
+    
     <!-- 主逻辑脚本 -->
     <script type="module" src="sketch.js"></script>
-  </body>
+</body>
 </html>

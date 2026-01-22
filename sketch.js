@@ -19,11 +19,19 @@ let isAudioStarted = false;
 // 状态变量
 let cohesionFactor = 0; // 0 (离散/躁动) -> 1 (凝聚/平滑)
 
+// --- 模式配置 ---
+const URL_PARAMS = new URLSearchParams(window.location.search);
+// 默认模式: 'interactive' (麦克风); 可选: 'demo' (自动演示)
+// 如果 URL 中有 ?mode=demo 或者文件名包含 demo.html，则切换到演示模式
+const IS_DEMO = URL_PARAMS.get('mode') === 'demo' || window.location.pathname.includes('demo.html');
+
 const CONFIG = {
     opacity: 0.9,      // 粒子透明度
     pointSize: 2.0,    // 基础点大小
     colorBase: new THREE.Color(0x00ffff), // 青蓝色
-    ambientCount: 3000 // 环境粒子数量
+    ambientCount: 3000, // 环境粒子数量
+    sensitivity: 3.0,   // 音频敏感度倍增 (Mobile Optimization)
+    demoSpeed: 0.5      // 演示模式下虚拟声音的变化速度
 };
 
 // --- 工具函数：环境粒子颜色 ---
@@ -107,9 +115,22 @@ function init() {
 
     // 6. 事件监听
     window.addEventListener('resize', onResize);
-    window.addEventListener('click', startAudioContext);
     
-    addOverlayText();
+    // 如果是交互模式，需要点击启动音频
+    if (!IS_DEMO) {
+        window.addEventListener('click', startAudioContext);
+        // 同时支持触摸事件
+        window.addEventListener('touchstart', startAudioContext);
+    } else {
+        // 演示模式：自动隐藏 Overlay (或者由外部 HTML 控制)
+        // 并启动虚拟音频循环
+        isAudioStarted = true; // 标记为已启动，虽然不需要真实 AudioContext
+        // 确保 dataArray 已初始化
+        dataArray = new Uint8Array(1024).fill(0);
+    }
+    
+    // Overlay 文本由 HTML 决定，不再这里硬编码
+    // addOverlayText(); 
 }
 
 // let ringSystem; // 已移除
@@ -701,6 +722,62 @@ function loadModel() {
     });
 }
 
+// 模拟音频数据 (Simplified for Performance & Rhythm)
+// 移除复杂的叙事循环，改为简单的高频节奏
+let lastBeatTime = 0;
+let beatInterval = 1.5; // 默认节奏 1.5s
+let currentSimulatedVolume = 0.5;
+
+function simulateAudioData() {
+    if (!dataArray) return;
+    
+    // 每 1-2 秒变换一次状态 (随机间隔)
+     if (time - lastBeatTime > beatInterval) {
+         lastBeatTime = time;
+         // 随机下一个间隔 1.0 ~ 2.0s
+         beatInterval = 1.0 + Math.random() * 1.0; 
+         
+         // 随机切换音量状态：
+         // 修改：80% 概率静默/微弱 (0.05) -> 保持离散
+         // 20% 概率强音 (0.8 ~ 1.0) -> 瞬间凝聚
+         if (Math.random() < 0.8) {
+             currentSimulatedVolume = 0.05; // 极低音量，彻底消散
+         } else {
+             currentSimulatedVolume = 0.8 + Math.random() * 0.2;
+             
+             // 触发视角切换 (仅在强音时)
+             const cs = window.cameraState;
+             if (cs) {
+                 cs.mode = 'swing'; // 强制切换
+                 cs.targetAngle = Math.random() * Math.PI * 2; // 全随机角度
+                 cs.lastSwitchTime = time;
+             }
+         }
+     }
+    
+    // 平滑过渡音量 (避免瞬间跳变，稍微 lerp 一下)
+    // 但为了节奏感，不需要太慢
+    
+    // 填充 dataArray
+    // 性能优化：只填充关键频段，不需要复杂的数学运算
+    for(let i = 0; i < dataArray.length; i++) {
+        let val = 0;
+        
+        // 简单的频谱分布模拟
+        if (i < 50) val = 255 * currentSimulatedVolume; // 低频满
+        else if (i < 200) val = 150 * currentSimulatedVolume; // 中频
+        else val = 50 * currentSimulatedVolume; // 高频
+        
+        // 加一点点随机噪点，避免死板
+        val += (Math.random() - 0.5) * 20;
+        
+        dataArray[i] = Math.max(0, Math.min(255, val));
+    }
+    
+    // 返回是否是强音 (burst)
+    return currentSimulatedVolume > 0.6;
+}
+
 function animate() {
     requestAnimationFrame(animate);
     
@@ -716,10 +793,16 @@ function animate() {
     let trebleLevel = 0;
     let spectralColor = new THREE.Color(0x00ffff); // 默认青色
 
-    if (isAudioStarted && analyser) {
-        analyser.getByteFrequencyData(dataArray);
+    // 1. 获取音频数据
+    let isBurst = false;
+    if (isAudioStarted) {
+        if (IS_DEMO) {
+            isBurst = simulateAudioData();
+        } else if (analyser) {
+            analyser.getByteFrequencyData(dataArray);
+        }
         
-        // 1. 计算总音量 Level
+        // 2. 计算总音量 Level
         let sum = 0;
         let bassSum = 0;
         let trebleSum = 0;
@@ -737,20 +820,48 @@ function animate() {
         
         level = (sum / dataArray.length) / 255.0; 
         
+        // 应用灵敏度增强 (仅在非演示模式下，或者都应用)
+        // 演示模式生成的数据已经是全幅的，不需要增强
+        if (!IS_DEMO) {
+            level *= CONFIG.sensitivity;
+            level = Math.min(1.0, level); // 限制最大值
+        }
+        
         // 归一化 Bass/Treble
         bassLevel = (bassSum / 20) / 255.0;
         trebleLevel = (trebleSum / 200) / 255.0;
         
-        // 2. 计算基于频谱的特殊颜色编码
+        if (!IS_DEMO) {
+            bassLevel = Math.min(1.0, bassLevel * CONFIG.sensitivity);
+            trebleLevel = Math.min(1.0, trebleLevel * CONFIG.sensitivity);
+        }
+        
+        // 3. 计算基于频谱的特殊颜色编码
         if (level > 0.01) {
-             spectralColor = getSpectralColor(dataArray);
+             // 演示模式下简单模拟颜色变化
+             if (IS_DEMO) {
+                 spectralColor.setHSL(0.5 + Math.sin(time) * 0.2, 1.0, 0.6);
+             } else {
+                 spectralColor = getSpectralColor(dataArray);
+             }
         }
     }
 
     // 目标凝聚度计算：
     // 音量越高 (level -> 1)，越凝聚 (cohesion -> 1)
     // 音量越低 (level -> 0)，越离散 (cohesion -> 0)
-    let targetCohesion = Math.min(1.0, level * 5.0); 
+    
+    // Demo 模式下，强制提高凝聚度的基准，让马看起来更完整
+    // 修正：现在我们有了叙事循环，需要让马在静默期真正消散
+    // 所以只在非静默期才强制凝聚
+    let baseLevel = level;
+    if (IS_DEMO) {
+        // 直接使用 level，因为 simulateAudioData 已经处理好了逻辑
+        // 不需要额外的强制修正
+        baseLevel = level;
+    }
+    
+    let targetCohesion = Math.min(1.0, baseLevel * 5.0); 
     
     // 平滑插值 (Asymmetric Lerp)
     // Attack (变凝聚/有声音): 快速 (0.2)
@@ -817,21 +928,20 @@ let targetRandomScale = 0.3; // 目标随机缩放值
     const cs = window.cameraState;
     
     // 1. 状态切换逻辑
-    // 每隔 3-5 秒尝试切换一次目标角度
-    if (time - cs.lastSwitchTime > 3.0 + Math.random() * 2.0) {
-        cs.lastSwitchTime = time;
-        
-        // 随机决定是继续 idle 还是大幅 swing
-        // 30% 概率大幅摆动，70% 概率微调
-        if (Math.random() < 0.3) {
-            cs.mode = 'swing';
-            // 大幅摆动：全方位 360 度随机
-            // 0 ~ 2PI
-            cs.targetAngle = Math.random() * Math.PI * 2;
-        } else {
-            cs.mode = 'idle';
-            // 微调：在当前角度附近 +/- 20度
-            cs.targetAngle = cs.angle + (Math.random() - 0.5) * 0.7;
+    // Demo 模式下，直接在 simulateAudioData 里处理切换，这里只处理非 Demo 模式
+    if (!IS_DEMO) {
+        // 每隔 3-5 秒尝试切换一次目标角度
+        if (time - cs.lastSwitchTime > 3.0 + Math.random() * 2.0) {
+            cs.lastSwitchTime = time;
+            
+            // 随机决定是继续 idle 还是大幅 swing
+            if (Math.random() < 0.3) {
+                cs.mode = 'swing';
+                cs.targetAngle = Math.random() * Math.PI * 2;
+            } else {
+                cs.mode = 'idle';
+                cs.targetAngle = cs.angle + (Math.random() - 0.5) * 0.7;
+            }
         }
     }
     

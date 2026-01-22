@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Visualizer - Exhibition Mode</title>
+    
+    <!-- 配置 Import Map 以支持 Three.js 模块 -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.skypack.dev/three@0.136.0",
+          "three/addons/": "https://cdn.skypack.dev/three@0.136.0/examples/jsm/"
+        }
+      }
+    </script>
+    
+    <link rel="stylesheet" type="text/css" href="style.css">
+    
+    <style>
+        /* 演示模式专用样式 */
+        body {
+            overflow: hidden;
+            background-color: #000;
+        }
+        
+        #exhibition-overlay {
+            position: absolute;
+            top: 50%;
+            left: 10%;
+            transform: translateY(-50%);
+            width: 30%;
+            color: #fff;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            z-index: 100;
+            pointer-events: none;
+            mix-blend-mode: difference;
+        }
+        
+        h1 {
+            font-size: 3em;
+            font-weight: 100;
+            letter-spacing: 5px;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            border-bottom: 1px solid rgba(255,255,255,0.3);
+            padding-bottom: 20px;
+        }
+        
+        p {
+            font-size: 1.1em;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            color: rgba(255,255,255,0.8);
+        }
+        
+        .qr-section {
+            margin-top: 50px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: rgba(0,0,0,0.5);
+            display: inline-block;
+        }
+        
+        .qr-placeholder {
+            width: 150px;
+            height: 150px;
+            background: #fff;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #000;
+            font-size: 0.8em;
+        }
+        
+        .scan-hint {
+            font-size: 0.9em;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        
+        /* 隐藏原有的 overlay */
+        #overlay-text {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="exhibition-overlay">
+        <h1>天马<br>Celestial Steed</h1>
+        
+        <p>
+            这是一个探索声音与形态关系的生成艺术装置。
+        </p>
+        <p>
+            天马化身为声音能量的载体，将转瞬即逝的声波转化为穿越数字宇宙的永恒旅程。
+        </p>
+        
+        <div class="qr-section">
+            <div class="qr-placeholder">
+                [二维码区域]
+            </div>
+            <div class="scan-hint">扫码互动</div>
+        </div>
+    </div>
+
+    <!-- 主逻辑脚本 -->
+    <script type="module" src="sketch.js"></script>
+</body>
+</html>
